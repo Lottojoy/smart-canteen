@@ -8,7 +8,7 @@ st.set_page_config(page_title="Smart Canteen by SekSolo", page_icon="🍽️", l
 
 st.title("🍽️ ระบบแนะนำโรงอาหารอัจฉริยะ (Smart Canteen)")
 st.markdown("**โรงอาหารหอพักนิสิต (โรงส้ม) มหาวิทยาลัยเกษตรศาสตร์ วิทยาเขตกำแพงแสน**")
-st.sidebar.markdown("### 👨‍💻 พัฒนาโดยกลุ่ม: SekSolo")
+st.sidebar.markdown("### 👨‍💻 พัฒนาโดยกลุ่ม: SekSolo สร้างโดย Lottojoy")
 
 # --- 2. ฟังก์ชันจำลองข้อมูล (Mock Data) ระหว่างรอของจริง ---
 # จำลองข้อมูล 120 แถว (10 วัน วันละ 12 ช่วงเวลา)
