@@ -5,7 +5,7 @@ import numpy as np
 import plotly.express as px
 import joblib
 from pathlib import Path
-
+from PIL import Image
 # ดึงตัวแปรและฟังก์ชันจากไฟล์ canteen_common.py
 from canteen_common import (
     TOTAL_TABLES, FLOOD_LABELS_TH, 
@@ -177,8 +177,21 @@ with tab4:
     
     st.subheader("📍 สถานที่ศึกษา: โรงอาหารหอพักนิสิต (โรงส้ม)")
     
+    # ฟังก์ชันสำหรับ Crop รูปภาพให้เป็นสี่เหลี่ยมจัตุรัส (1:1) จากจุดกึ่งกลาง
+    def crop_to_square(image):
+        width, height = image.size
+        # หาขนาดด้านที่สั้นที่สุด
+        new_size = min(width, height)
+        
+        # คำนวณพิกัดเพื่อตัดจากตรงกลาง
+        left = (width - new_size) / 2
+        top = (height - new_size) / 2
+        right = (width + new_size) / 2
+        bottom = (height + new_size) / 2
+        
+        return image.crop((left, top, right, bottom))
+
     # --- แกลลอรีรูปภาพ 3x3 (บีบรูปให้เล็กลงโดยเพิ่มพื้นที่ว่างซ้าย-ขวา) ---
-    # สัดส่วนคอลัมน์: [ว่างขอบซ้าย, รูป1, รูป2, รูป3, ว่างขอบขวา]
     margin_left, col_img1, col_img2, col_img3, margin_right = st.columns([1.5, 2, 2, 2, 1.5])
     img_cols = [col_img1, col_img2, col_img3]
     
@@ -189,7 +202,10 @@ with tab4:
         if os.path.exists(img_name):
             found_any_image = True
             with img_cols[(i - 1) % 3]:
-                st.image(img_name, use_container_width=True)
+                # เปิดรูปภาพ -> นำไป Crop เป็นสี่เหลี่ยมจัตุรัส -> แสดงผล
+                img = Image.open(img_name)
+                cropped_img = crop_to_square(img)
+                st.image(cropped_img, use_container_width=True)
                 
     if not found_any_image:
         st.info("💡 **Tips:** อัปโหลดภาพบรรยากาศโรงอาหาร ตั้งชื่อไฟล์ว่า `canteen_img_1.jpg` ถึง `canteen_img_9.jpg` ลงใน GitHub เพื่อแสดงผลเป็นแกลลอรีตรงนี้")
