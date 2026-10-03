@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,14 +6,32 @@ import plotly.express as px
 import joblib
 from pathlib import Path
 
-# ดึงตัวแปรและฟังก์ชันจากไฟล์ canteen_common.py ของจริง
+# ดึงตัวแปรและฟังก์ชันจากไฟล์ canteen_common.py
 from canteen_common import (
     TOTAL_TABLES, FLOOD_LABELS_TH, 
     WEEKDAYS_TH, MODEL_FILE, build_input, load_data
 )
 
-# --- ตั้งค่าหน้าเพจหลัก ---
+# --- 1. ตั้งค่าหน้าเพจหลัก ---
 st.set_page_config(page_title="Smart Canteen by SekSolo", page_icon="🍽️", layout="wide")
+
+# --- CSS Animation (ใส่ Transition แบบนุ่มนวล) ---
+st.markdown("""
+    <style>
+        /* เอฟเฟกต์ Fade-in สำหรับเนื้อหาทั้งหมด */
+        .stApp {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        /* ปรับให้ Expander (กล่องซ่อนข้อมูล) ค่อยๆ กางออกแบบสมูท */
+        .streamlit-expanderContent {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("🍽️ ระบบแนะนำโรงอาหารอัจฉริยะ (Smart Canteen)")
 st.markdown("**โรงอาหารหอพักนิสิต (โรงส้ม) มหาวิทยาลัยเกษตรศาสตร์ วิทยาเขตกำแพงแสน**")
@@ -28,8 +47,13 @@ def load_model():
 
 model_data = load_model()
 
-# --- สร้าง Tabs ---
-tab1, tab2, tab3 = st.tabs(["🎯 ระบบแนะนำเวลา", "📊 ข้อมูลจากการสำรวจจริง", "🧠 ประสิทธิภาพโมเดล AI"])
+# --- 2. สร้าง Tabs ---
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🎯 ระบบแนะนำเวลา", 
+    "📊 ข้อมูลจากการสำรวจจริง", 
+    "🧠 ประสิทธิภาพโมเดล AI", 
+    "ℹ️ เกี่ยวกับโปรเจกต์"
+])
 
 # ==========================================
 # TAB 1: ระบบแนะนำเวลา (Prediction)
@@ -40,7 +64,6 @@ with tab1:
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        # สลับ Key-Value สำหรับแสดงผลภาษาไทย
         day_options = {v: k for k, v in WEEKDAYS_TH.items()}
         selected_day_th = st.selectbox("📅 เลือกวัน", list(day_options.keys()))
         selected_time = st.selectbox("⏰ เลือกเวลา", [f"12:{str(m).zfill(2)}" for m in range(0, 60, 5)])
@@ -55,15 +78,12 @@ with tab1:
     
     if st.button("🚀 ประมวลผลด้วย AI", type="primary"):
         if model_data is None:
-            st.error("⚠️ ไม่พบไฟล์ AI (`canteen_model.pkl`) กรุณารัน `train.py` บนคอมพิวเตอร์เพื่อสร้างโมเดลก่อนครับ")
+            st.error("⚠️ ไม่พบไฟล์ AI (`canteen_model.pkl`) กรุณารัน `train.py` เพื่อสร้างโมเดลก่อน")
         else:
             model = model_data["model"]
-            
-            # แปลงค่าภาษาไทยกลับเป็นค่าที่ AI เข้าใจ
             selected_weekday_en = day_options[selected_day_th]
             selected_flood_en = flood_options_th[selected_flood_th]
             
-            # สร้างตารางข้อมูล 12 ช่วงเวลา
             input_df = build_input(
                 flood_cond=selected_flood_en,
                 max_temp=input_max_temp,
@@ -71,13 +91,9 @@ with tab1:
                 weekday=selected_weekday_en
             )
             
-            # ให้ AI ทำนาย (ผลลัพธ์เป็น Vacancy Rate)
             predictions_rate = model.predict(input_df)
-            
-            # คำนวณเป็นจำนวนโต๊ะว่าง (Rate * จำนวนโต๊ะทั้งหมด)
             input_df['Predicted_Vacant'] = np.clip(predictions_rate * TOTAL_TABLES, 0, TOTAL_TABLES).astype(int)
             
-            # ดึงเฉพาะเวลาที่ผู้ใช้เลือกมาแสดงผล
             result = input_df[input_df['Time'] == selected_time].iloc[0]
             predicted_vacant = result['Predicted_Vacant']
             
@@ -94,7 +110,6 @@ with tab1:
             else:
                 st.error("🚨 **คำแนะนำ:** โรงอาหารมีความหนาแน่นสูงมาก! แนะนำให้หลีกเลี่ยงหรือรออีก 15-20 นาที")
 
-            # แสดงกราฟเส้นแนวโน้มของทุกช่วงเวลาในวันนั้น
             st.markdown("**แนวโน้มโต๊ะว่างในช่วงเวลา 12:00 - 12:55 น.**")
             st.line_chart(input_df.set_index('Time')['Predicted_Vacant'], use_container_width=True)
 
@@ -109,10 +124,10 @@ with tab2:
         
         st.subheader("📈 จำนวนโต๊ะว่างเฉลี่ยตามช่วงเวลา")
         avg_time = df.groupby('Time')['Vacant'].mean().reset_index()
-        fig2 = px.line(avg_time, x='Time', y='Vacant', markers=True, title="โต๊ะว่างเฉลี่ย")
+        fig2 = px.line(avg_time, x='Time', y='Vacant', markers=True, title="โต๊ะว่างเฉลี่ยในช่วงเที่ยง")
         st.plotly_chart(fig2, use_container_width=True)
     except Exception as e:
-        st.error(f"⚠️️ ไม่สามารถโหลดไฟล์ข้อมูล Canteen Data.xlsx ได้: {e}")
+        st.error(f"⚠ ไม่สามารถโหลดไฟล์ข้อมูล Canteen Data.xlsx ได้: {e}")
 
 # ==========================================
 # TAB 3: ประสิทธิภาพโมเดล (Model Performance)
@@ -120,13 +135,81 @@ with tab2:
 with tab3:
     st.header("⚙️ สรุปผลการประเมินโมเดล (Model Evaluation)")
     if model_data:
-        st.success(f"ใช้โมเดล: **{model_data['model_name']}**")
-        st.markdown(f"**ชุดฟีเจอร์ที่ใช้:** {model_data['feature_set']}")
+        st.success(f"✅ เลือกใช้งานโมเดล: **{model_data['model_name']}** (ชุดฟีเจอร์: {model_data['feature_set']})")
         
-        st.subheader("📊 ผลการทดสอบโมเดล (Test Set)")
-        st.table(model_data['test_eval'])
+        eval_df = model_data['test_eval'].reset_index()
         
-        st.subheader("📈 เปรียบเทียบทุกโมเดลที่ทดลอง (Model Comparison)")
-        st.table(model_data['fs_compare'])
+        fig_model = px.bar(
+            eval_df, 
+            x='Model', 
+            y='RMSE', 
+            color='Model',
+            text_auto='.4f',
+            title="📊 เปรียบเทียบค่าความคลาดเคลื่อน (RMSE) ของแต่ละโมเดล (ยิ่งน้อยยิ่งดี)",
+            labels={'RMSE': 'ค่าความคลาดเคลื่อน RMSE (โต๊ะ)'}
+        )
+        fig_model.update_layout(showlegend=False)
+        st.plotly_chart(fig_model, use_container_width=True)
+        
+        st.markdown("### 🤔 ทำไม Random Forest ถึงแม่นยำที่สุด?")
+        col_reason1, col_reason2, col_reason3 = st.columns(3)
+        with col_reason1:
+            st.info("**Linear Regression**\n\nมองความสัมพันธ์แบบเส้นตรง ซึ่งในชีวิตจริง คนไม่ได้เข้าโรงอาหารเป็นเส้นตรง (เช่น 12.15 คนจะพุ่งสูงปรี๊ด) โมเดลนี้จึงทายคลาดเคลื่อนเยอะสุด")
+        with col_reason2:
+            st.warning("**Decision Tree**\n\nใช้การสร้างกฎ (If-Else) ทำให้จับทิศทางเวลาและสภาพอากาศได้ดีกว่า แต่มีข้อเสียคืออาจจะ 'จำข้อสอบ' (Overfitting) มากเกินไป")
+        with col_reason3:
+            st.success("**Random Forest**\n\nใช้ต้นไม้หลายๆ ต้นมาโหวตกัน (Ensemble) ทำให้ลดความผิดพลาดจากข้อมูลที่แกว่งไปมาได้ดีที่สุด และทนทานต่อปัจจัยแทรกซ้อนอย่างฝนตก")
+
+        with st.expander("📄 ดูตารางข้อมูลเชิงลึก (Raw Data)"):
+            st.markdown("**1. ผลการทดสอบโมเดล (Test Set)**")
+            st.dataframe(eval_df, use_container_width=True)
+            
+            st.markdown("**2. เปรียบเทียบทุกชุดฟีเจอร์ที่ทดลอง (Model Comparison)**")
+            st.dataframe(model_data['fs_compare'], use_container_width=True)
     else:
-        st.warning("⚠️️ ยังไม่มีข้อมูลการประเมินโมเดล กรุณารัน train.py ก่อน")
+        st.warning("⚠ ยังไม่มีข้อมูลการประเมินโมเดล กรุณารัน train.py ก่อน")
+
+# ==========================================
+# TAB 4: เกี่ยวกับโปรเจกต์ (About)
+# ==========================================
+with tab4:
+    st.header("📸 ข้อมูลโครงงานและผู้จัดทำ")
+    
+    st.subheader("📍 สถานที่ศึกษา: โรงอาหารหอพักนิสิต (โรงส้ม)")
+    
+    # --- แกลลอรีรูปภาพ 3x3 ---
+    cols = st.columns(3)
+    found_any_image = False
+    
+    for i in range(1, 10):
+        img_name = f"canteen_img_{i}.jpg"
+        if os.path.exists(img_name):
+            found_any_image = True
+            with cols[(i - 1) % 3]:
+                st.image(img_name, use_column_width=True)
+                
+    if not found_any_image:
+        st.info("💡 **Tips:** อัปโหลดภาพบรรยากาศโรงอาหาร ตั้งชื่อไฟล์ว่า `canteen_img_1.jpg`, `canteen_img_2.jpg` ไปจนถึง `canteen_img_9.jpg` ลงใน GitHub เพื่อแสดงเป็นแกลลอรีตรงนี้ (รองรับสูงสุด 9 รูป)")
+    
+    st.divider()
+    
+    col_about1, col_about2 = st.columns(2)
+    with col_about1:
+        st.subheader("📋 หลักฐานการเก็บข้อมูล")
+        st.markdown("""
+        * **ระยะเวลาการเก็บข้อมูล:** 10 วันทำการ (จันทร์-ศุกร์)
+        * **ช่วงเวลา:** 12:00 น. - 13:00 น. (ความถี่ทุก 5 นาที)
+        * **วิธีการ:** ลงพื้นที่สังเกตการณ์ สุ่มนับโต๊ะว่าง และบันทึกสภาพอากาศจริงควบคู่กับฐานข้อมูลจากกรมอุตุนิยมวิทยา
+        * **จำนวนข้อมูลรวม:** 120 Observations (ใช้งานจริงหลังจากล้างข้อมูล)
+        """)
+        
+    with col_about2:
+        st.subheader("👨‍💻 คณะผู้จัดทำ (ทีม SekSolo)")
+        st.markdown("""
+        **รายวิชา Object-Oriented Programming**
+        
+        1. นายชยพล รื่นเพชร (หัวหน้าโปรเจกต์/นักพัฒนา)
+        2. นาย... (ระบุชื่อเพื่อนคนที่ 2)
+        3. นาย... (ระบุชื่อเพื่อนคนที่ 3)
+        4. นาย... (ระบุชื่อเพื่อนคนที่ 4)
+        """)
