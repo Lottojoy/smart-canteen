@@ -177,22 +177,22 @@ with tab4:
     
     st.subheader("📍 สถานที่ศึกษา: โรงอาหารหอพักนิสิต (โรงส้ม)")
     
-    # --- แกลลอรีรูปภาพ 3x3 ---
-    cols = st.columns(3)
-    found_any_image = False
-
+    # --- แกลลอรีรูปภาพ 3x3 (บีบรูปให้เล็กลงโดยเพิ่มพื้นที่ว่างซ้าย-ขวา) ---
+    # สัดส่วนคอลัมน์: [ว่างขอบซ้าย, รูป1, รูป2, รูป3, ว่างขอบขวา]
     margin_left, col_img1, col_img2, col_img3, margin_right = st.columns([1.5, 2, 2, 2, 1.5])
     img_cols = [col_img1, col_img2, col_img3]
+    
+    found_any_image = False
     
     for i in range(1, 10):
         img_name = f"canteen_img_{i}.jpg"
         if os.path.exists(img_name):
             found_any_image = True
-            with cols[(i - 1) % 3]:
-                st.image(img_name, use_column_width=True)
+            with img_cols[(i - 1) % 3]:
+                st.image(img_name, use_container_width=True)
                 
     if not found_any_image:
-        st.info("💡 **Tips:** อัปโหลดภาพบรรยากาศโรงอาหาร ตั้งชื่อไฟล์ว่า `canteen_img_1.jpg`, `canteen_img_2.jpg` ไปจนถึง `canteen_img_9.jpg` ลงใน GitHub เพื่อแสดงเป็นแกลลอรีตรงนี้ (รองรับสูงสุด 9 รูป)")
+        st.info("💡 **Tips:** อัปโหลดภาพบรรยากาศโรงอาหาร ตั้งชื่อไฟล์ว่า `canteen_img_1.jpg` ถึง `canteen_img_9.jpg` ลงใน GitHub เพื่อแสดงผลเป็นแกลลอรีตรงนี้")
     
     st.divider()
     
