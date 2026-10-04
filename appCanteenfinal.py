@@ -164,8 +164,7 @@ with tab3:
             st.markdown("**1. ผลการทดสอบโมเดล (Test Set)**")
             st.dataframe(eval_df, use_container_width=True)
             
-            st.markdown("**2. เปรียบเทียบทุกชุดฟีเจอร์ที่ทดลอง (Model Comparison)**")
-            st.dataframe(model_data['fs_compare'], use_container_width=True)
+            
     else:
         st.warning("⚠ ยังไม่มีข้อมูลการประเมินโมเดล กรุณารัน train.py ก่อน")
 
