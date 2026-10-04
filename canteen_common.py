@@ -36,7 +36,7 @@ FLOOD_LABELS_TH = {"No Flooding": "ปกติ (ไม่มีน้ำท่�
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"]
 WEEKDAYS_TH = {"monday": "จันทร์", "tuesday": "อังคาร", "wednesday": "พุธ",
                "thursday": "พฤหัสบดี", "friday": "ศุกร์"}
-HOT_THRESHOLD = 34.0   # เกณฑ์ในไฟล์: อุณหภูมิสูงสุด > 34°C = ร้อน
+HOT_THRESHOLD = 34.0   # อุณหภูมิสูงสุด >= 34°C = ร้อน (ตรงกับข้อมูลจริง: วันที่ 12 อุณหภูมิ 34.0 บันทึกว่า Hot)
 
 # ชุดฟีเจอร์ที่จะเปรียบเทียบ: (คอลัมน์ตัวเลข, คอลัมน์หมวดหมู่)
 FEATURE_SETS = {
@@ -47,6 +47,13 @@ FEATURE_SETS = {
     "เวลา + สภาพอากาศทั้งหมด":      (["Minute", "Minute2", "MaxTemp", "Rainfall", "IsHot"], ["FloodCond"]),
     "ทุกอย่าง (รวมวัน)":            (["Minute", "Minute2", "MaxTemp", "Rainfall", "IsHot"], ["FloodCond", "Weekday"]),
 }
+
+
+# ฟีเจอร์ที่ใช้เทรนจริง ยึดตาม Input Data ใน Proposal: วันในสัปดาห์, เวลา, สภาพอุณหภูมิ, สภาพฝนและน้ำท่วม,
+# อุณหภูมิสูงสุด, ปริมาณน้ำฝน (ไม่ใช้จำนวนโต๊ะว่าง/โต๊ะมีคนนั่ง เพราะเป็นตัวสร้าง Target = data leakage)
+# BadWeather = จัดกลุ่ม "น้ำท่วม" และ "ฝนตกต่อเนื่อง" รวมกัน (ฝนตกต่อเนื่องมีแค่ 1 วัน เรียนรู้แยกไม่ได้)
+PROPOSAL_FEATURES = (["Minute", "Minute2", "MaxTemp", "Rainfall", "BadWeather"], ["Weekday", "TempCond"])
+PROPOSAL_FS_NAME = "ตาม Proposal (วัน เวลา อุณหภูมิ ฝน/น้ำท่วม)"
 
 
 def find_data_file():
@@ -64,7 +71,7 @@ def add_derived_features(df):
     df["Minute"] = (t.dt.hour * 60 + t.dt.minute) - 12 * 60   # นาทีนับจาก 12:00
     df["Minute2"] = df["Minute"] ** 2                         # ให้จับกราฟโค้งได้
     df["BadWeather"] = df["FloodCond"].isin(["Flooding", "Continuous Rain"]).astype(int)
-    df["IsHot"] = (df["MaxTemp"] > HOT_THRESHOLD).astype(float)
+    df["IsHot"] = (df["MaxTemp"] >= HOT_THRESHOLD).astype(float)
     df.loc[df["MaxTemp"].isna(), "IsHot"] = np.nan
     return df
 
@@ -105,7 +112,8 @@ def build_input(flood_cond="No Flooding", max_temp=33.0, rainfall=0.0, weekday="
     d["BadWeather"] = int(flood_cond in ("Flooding", "Continuous Rain"))
     d["MaxTemp"] = max_temp
     d["Rainfall"] = rainfall
-    d["IsHot"] = float(max_temp > HOT_THRESHOLD)
+    d["IsHot"] = float(max_temp >= HOT_THRESHOLD)
+    d["TempCond"] = "Hot" if max_temp >= HOT_THRESHOLD else "Not Hot"
     d["Weekday"] = weekday
     d["Time"] = [f"12:{m:02d}" for m in minutes]
     return d
@@ -143,3 +151,23 @@ def library_versions():
     """เวอร์ชันไลบรารีที่ใช้เทรน เก็บไว้ใน .pkl เพื่อเตือนถ้าเวอร์ชันตอนรันแอปไม่ตรง"""
     import sklearn
     return {"scikit-learn": sklearn.__version__, "pandas": pd.__version__, "numpy": np.__version__}
+
+
+def data_fingerprint(df):
+    """ลายนิ้วมือของข้อมูลที่ผ่านการทำความสะอาดแล้ว (ไม่เปลี่ยนเมื่อแค่กด save ไฟล์ Excel โดยไม่แก้ข้อมูล)
+    train.py เก็บค่านี้ไว้ใน .pkl และแอปใช้เทียบ เพื่อเตือนเมื่อแก้ข้อมูลแต่ยังไม่ได้เทรนใหม่"""
+    import hashlib
+    cols = ["DayNo", "Time", "Weekday", "Vacant", "Occupied", "FloodCond", "MaxTemp", "Rainfall"]
+    text = df[cols].astype(str).to_csv(index=False)
+    return hashlib.md5(text.encode("utf-8")).hexdigest()[:12]
+
+
+def split_by_day(df):
+    """แบ่ง Train/Test ตามวัน (ข้อมูลที่เก็บห่างกัน 5 นาทีคล้ายกันมาก การสุ่มรายแถวจะทำให้ข้อมูลรั่วเข้าชุดทดสอบ)
+    วันทดสอบ 2 วัน = วันปกติ 1 วัน + วันสภาพอากาศแย่ 1 วัน (random seed คงที่) -> Train 120 / Test 24 แถว
+    คืนค่า (test_days, test_mask)"""
+    rng = np.random.RandomState(RANDOM_STATE)
+    day_bad = df.groupby("DayNo")["BadWeather"].max()
+    test_days = sorted(int(d) for d in [rng.choice(day_bad[day_bad == 0].index.to_numpy()),
+                                        rng.choice(day_bad[day_bad == 1].index.to_numpy())])
+    return test_days, df["DayNo"].isin(test_days).to_numpy()
