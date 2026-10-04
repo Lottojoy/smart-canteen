@@ -222,19 +222,23 @@ with tab4:
     
     found_any_image = False
     
+    # กำหนดโฟลเดอร์ที่เก็บรูปภาพ (โฟลเดอร์ชื่อ 'images')
+    image_folder = Path(__file__).resolve().parent / "images"
+    
     for i in range(1, 10):
-        img_name = f"canteen_img_{i}.jpg"
-        if os.path.exists(img_name):
+        # ชี้เส้นทางไปที่โฟลเดอร์ images
+        img_path = image_folder / f"canteen_img_{i}.jpg"
+        
+        if img_path.exists():
             found_any_image = True
             with img_cols[(i - 1) % 3]:
                 # เปิดรูปภาพ -> นำไป Crop เป็นสี่เหลี่ยมจัตุรัส -> แสดงผล
-                img = Image.open(img_name)
+                img = Image.open(img_path)
                 cropped_img = crop_to_square(img)
                 st.image(cropped_img, use_container_width=True)
                 
     if not found_any_image:
-        st.info("💡 **Tips:** อัปโหลดภาพบรรยากาศโรงอาหาร ตั้งชื่อไฟล์ว่า `canteen_img_1.jpg` ถึง `canteen_img_9.jpg` ลงใน GitHub เพื่อแสดงผลเป็นแกลลอรีตรงนี้")
-    
+        st.info("💡 **Tips:** สร้างโฟลเดอร์ชื่อ `images` และอัปโหลดภาพบรรยากาศโรงอาหาร ตั้งชื่อไฟล์ว่า `canteen_img_1.jpg` ถึง `canteen_img_9.jpg` เข้าไปไว้ในนั้น เพื่อให้แสดงผลเป็นแกลลอรีตรงนี้")
     st.divider()
     
     col_about1, col_about2 = st.columns(2)
